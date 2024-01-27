@@ -2,8 +2,12 @@
 using CourseOOP_Gachkovsky.Models;
 using CourseOOP_Gachkovsky.ViewModels;
 using CourseOOP_Gachkovsky.Windows;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -28,10 +32,11 @@ namespace CourseOOP_Gachkovsky
         Serialize serialize = new Serialize();
         TourViewModel vmTour = new TourViewModel();
         RezerveTourViewModel vmRezerveTour = new RezerveTourViewModel();
-        
+
 
         public MainWindow()
         {
+            DeleteTempFiles();
             InitializeComponent();
             ClearTourInput();
             if (File.Exists(Directory.GetCurrentDirectory() + "\\Tours.xml")) GetDeserializeObjects();
@@ -41,6 +46,7 @@ namespace CourseOOP_Gachkovsky
 
             ListRezeveTours.ItemsSource = vmRezerveTourDPO.ListRezerveToursDPO;
         }
+
 
         public void ClearTourInput()
         {
@@ -100,8 +106,9 @@ namespace CourseOOP_Gachkovsky
                 PriceTour = float.Parse(tb_PriceTour.Text),
                 CountDays = int.Parse(tb_CountDays.Text),
                 CountTickets = int.Parse(tb_CountTickets.Text),
+                //ImgUrl = Directory.GetCurrentDirectory() + "\\Images\\" + "\\Temp\\" + vmTour.MaxId().ToString() + ".png",
+                ImgUrl = null,
                 IsActual = true
-                // Путь к изображению
             };
             return tour;
         }
@@ -110,18 +117,31 @@ namespace CourseOOP_Gachkovsky
         {
             TourViewModel NewVMTours = serialize.DeserializeTourXML();
             vmTour.ListTours.Clear();
+
             foreach (Tour tour in NewVMTours.ListTours)
             {
+                AddTempImage(tour);
+                if (File.Exists(Directory.GetCurrentDirectory() + "\\Images\\" + "\\Temp\\" + "Temp" + (tour.Id - 1).ToString() + ".png"))
+                {
+                    tour.ImgUrl = Directory.GetCurrentDirectory() + "\\Images\\" + "\\Temp\\" + "Temp" + (tour.Id - 1).ToString() + ".png";
+                }
+                else
+                {
+                    tour.ImgUrl = Directory.GetCurrentDirectory() + "\\Images\\" + "default.png";
+                }
                 vmTour.ListTours.Add(tour);
             }
 
-            if (vmTour.ListTours.Count > 0 && new FileInfo(Directory.GetCurrentDirectory() + "\\RezerveTours.xml").Length != 0)
+            if (File.Exists(Directory.GetCurrentDirectory() + "\\RezerveTours.xml"))
             {
-                RezerveTourViewModel NewVMRezerveTours = serialize.DeserializeRezerveTourXML();
-                vmRezerveTour.ListRezerveTours.Clear();
-                foreach (RezerveTour rezerveTour in NewVMRezerveTours.ListRezerveTours)
+                if (vmTour.ListTours.Count > 0 && new FileInfo(Directory.GetCurrentDirectory() + "\\RezerveTours.xml").Length != 0)
                 {
-                    vmRezerveTour.ListRezerveTours.Add(rezerveTour);
+                    RezerveTourViewModel NewVMRezerveTours = serialize.DeserializeRezerveTourXML();
+                    vmRezerveTour.ListRezerveTours.Clear();
+                    foreach (RezerveTour rezerveTour in NewVMRezerveTours.ListRezerveTours)
+                    {
+                        vmRezerveTour.ListRezerveTours.Add(rezerveTour);
+                    }
                 }
             }
         }
@@ -177,11 +197,10 @@ namespace CourseOOP_Gachkovsky
                         t.PriceTour = tour.PriceTour;
                         t.CountDays = tour.CountDays;
                         t.CountTickets = tour.CountTickets;
-                        if (tour.CountTickets >= 0) t.IsActual = true;
-                        else t.IsActual = false;
+                        t.ImgUrl = Directory.GetCurrentDirectory() + "\\Images\\" + (tour.Id - 1).ToString() + ".png";
+                        t.IsActual = tour.CountTickets >= 0;
                     }
                 }
-
                 RefreshListTours();
                 serialize.SerializeTourXML(vmTour);
             }
@@ -200,8 +219,9 @@ namespace CourseOOP_Gachkovsky
                     {
                         vmTour.ListTours.Remove(t);
                     }
+                    FileInfo fileInfo = new FileInfo(Directory.GetCurrentDirectory() + "\\Images\\" + (currentId - 1).ToString() + ".png");
+                    if (fileInfo.Exists) fileInfo.Delete();
                 }
-                RefreshListTours();
                 serialize.SerializeTourXML(vmTour);
             }
             else MessageBox.Show("Выберите удаляемый элемент", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -209,14 +229,16 @@ namespace CourseOOP_Gachkovsky
 
         private void ListTours_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            Tour currentTour = new Tour();
-            if (ListTours.SelectedItems.Count == 1) 
+
+            if (ListTours.SelectedItems.Count == 1)
             {
+                Tour currentTour = new Tour();
                 currentTour = (Tour)ListTours.SelectedItem;
+                NewRezerveTourWindow newRezerveTourWindow = new NewRezerveTourWindow(currentTour, vmTour, vmRezerveTour);
+                newRezerveTourWindow.Closed += (s, args) => RefreshListTours();
+                newRezerveTourWindow.Show();
             }
-            NewRezerveTourWindow newRezerveTourWindow = new NewRezerveTourWindow(currentTour,vmTour,vmRezerveTour);
-            newRezerveTourWindow.Closed += (s, args) => RefreshListTours();
-            newRezerveTourWindow.Show();
+            else MessageBox.Show("Не выбран пункт", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         private void ListRezeveTours_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -238,6 +260,104 @@ namespace CourseOOP_Gachkovsky
                 if (!Char.IsDigit(c)) return false;
             }
             return true;
+        }
+
+        private void btnAddImage_Click(object sender, RoutedEventArgs e)
+        {
+            
+            if (ListToursAdd.SelectedItems.Count == 1)
+            {
+                int currentId = int.Parse(tb_IdTour.Text);
+                foreach (Tour t in vmTour.ListTours.ToArray())
+                {
+                    if (t.Id == currentId && currentId.ToString() != string.Empty)
+                    {
+                        AddImage(t.Id);
+
+                        if (!File.Exists(Directory.GetCurrentDirectory() + "\\Images\\" + "\\Temp\\" + "Temp" + (t.Id - 1).ToString() + ".png"))
+                        {
+                            AddTempImage(t);
+                        }
+                    }
+                }
+            }
+            else 
+            {
+                MessageBox.Show("Добавление изображений возможно только на созданные объекты, во избежании ошибок", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+
+            ListTours.ItemsSource = null;
+            foreach (Tour tour in vmTour.ListTours)
+            {
+                tour.ImgUrl = Directory.GetCurrentDirectory() + "\\Images\\" + (tour.Id - 1).ToString() + ".png";
+            }
+            ListTours.ItemsSource = vmTour.ListTours;
+
+            RefreshListTours();
+            serialize.SerializeTourXML(vmTour);
+
+            RestartForm();
+        }
+
+        public void AddImage(int TourID)
+        {
+            OpenFileDialog open_dialog = new OpenFileDialog();
+            open_dialog.Filter = "Image Files(*.BMP;*.JPG;*.GIF;*.PNG)|*.BMP;*.JPG;*.GIF;*.PNG|All files (*.*)|*.*"; //формат загружаемого файла
+            bool result = (bool)open_dialog.ShowDialog();
+
+            if (result)
+            {
+                string filename = open_dialog.FileName;
+                FileInfo fileInfo = new FileInfo(filename);
+                Directory.CreateDirectory(Directory.GetCurrentDirectory() + "\\Images");
+
+                if (!File.Exists(Directory.GetCurrentDirectory() + "\\Images\\" + (TourID - 1).ToString() + ".png"))
+                    fileInfo.CopyTo(Directory.GetCurrentDirectory() + "\\Images\\" + (TourID - 1).ToString() + ".png");
+                else
+                {
+                    File.Delete(Directory.GetCurrentDirectory() + "\\Images\\" + (TourID - 1).ToString() + ".png");
+                    fileInfo.CopyTo(Directory.GetCurrentDirectory() + "\\Images\\" + (TourID - 1).ToString() + ".png");
+                }
+            }
+            else MessageBox.Show("Невозможно открыть выбранный файл / Не выбран файл для загрузки", "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            
+            RefreshListTours();
+        }
+
+        public void AddTempImage(Tour tour)
+        {
+
+            FileInfo fileInfo = new FileInfo(Directory.GetCurrentDirectory() + "\\Images\\" + (tour.Id - 1).ToString() + ".png");
+            Directory.CreateDirectory(Directory.GetCurrentDirectory() + "\\Images");
+
+            if (fileInfo.Exists)
+            {
+                string pathTempFile = tour.ImgUrl = Directory.GetCurrentDirectory() + "\\Images\\" + "\\Temp\\" + "Temp" + (tour.Id - 1).ToString() + ".png";
+                fileInfo.CopyTo(pathTempFile);
+                tour.ImgUrl = pathTempFile;
+            }
+            RefreshListTours();
+        }
+
+        private void DeleteTempFiles()
+        {
+            string DeleteThis = "Temp";
+            Directory.CreateDirectory(Directory.GetCurrentDirectory() + "\\Images\\" + "\\Temp\\");
+            string[] Files = Directory.GetFiles(Directory.GetCurrentDirectory() + "\\Images\\" + "\\Temp\\");
+
+            foreach (string file in Files)
+            {
+                if (file.ToUpper().Contains(DeleteThis.ToUpper()))
+                {
+                    File.Delete(file);
+                }
+            }
+        }
+
+        private void RestartForm()
+        {
+            System.Diagnostics.Process.Start(Application.ResourceAssembly.Location);
+            Application.Current.Shutdown();
         }
     }
 }
