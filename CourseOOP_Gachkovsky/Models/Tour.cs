@@ -41,11 +41,5 @@ namespace CourseOOP_Gachkovsky.Models
             }
             serialize.SerializeTourXML(tours);
         }
-
-        //public void AddTickets(int CountTickets, TourViewModel tours)
-        //{
-        //    this.CountTickets += CountTickets;
-        //}
-
     }
 }
