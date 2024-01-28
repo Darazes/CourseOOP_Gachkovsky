@@ -285,17 +285,17 @@ namespace CourseOOP_Gachkovsky
                 MessageBox.Show("Добавление изображений возможно только на созданные объекты, во избежании ошибок", "Предупреждение", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
 
-            //ListTours.ItemsSource = null;
-            //foreach (Tour tour in vmTour.ListTours)
-            //{
-            //    tour.ImgUrl = Directory.GetCurrentDirectory() + "\\Images\\" + (tour.Id - 1).ToString() + ".png";
-            //}
-            //ListTours.ItemsSource = vmTour.ListTours;
+            ListTours.ItemsSource = null;
+            foreach (Tour tour in vmTour.ListTours)
+            {
+                tour.ImgUrl = Directory.GetCurrentDirectory() + "\\Images\\" + (tour.Id - 1).ToString() + ".png";
+            }
+            ListTours.ItemsSource = vmTour.ListTours;
 
             RefreshListTours();
             serialize.SerializeTourXML(vmTour);
 
-            //RestartForm();
+            RestartForm();
         }
 
         public void AddImage(int TourID)
